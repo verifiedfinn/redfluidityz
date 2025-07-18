@@ -7,6 +7,7 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   noStroke();
   background(0);
+  frameRate(60); // smoother timing across browsers
 
   for (let i = 0; i < num; i++) {
     particles.push(new Particle(random(width), random(height)));
@@ -14,7 +15,7 @@ function setup() {
 }
 
 function draw() {
-  fill(0, 20); // fading trail effect
+  fill(0, 20); // preserve trailing aesthetic
   rect(0, 0, width, height);
 
   for (let p of particles) {
@@ -23,6 +24,11 @@ function draw() {
   }
 
   t += 0.002;
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  background(0); // clears weird stretched trails on resize
 }
 
 class Particle {
@@ -49,15 +55,15 @@ class Particle {
     this.pos.y = (this.pos.y + height) % height;
   }
 
-display() {
-  let d = dist(this.pos.x, this.pos.y, width / 2, height / 2);
+  display() {
+    let dx = this.pos.x - width / 2;
+    let dy = this.pos.y - height / 2;
+    let d = sqrt(dx * dx + dy * dy); // same result, faster than dist()
 
-  // Deep red modulation only
-  let red = 150 + sin(t * 2 + this.offset + d * 0.005) * 80; // elegant deep red
-  let alpha = map(sin(t + d * 0.02), -1, 1, 60, 200);
+    let red = 150 + sin(t * 2 + this.offset + d * 0.005) * 80;
+    let alpha = map(sin(t + d * 0.02), -1, 1, 60, 200);
 
-  fill(red, 0, 0, alpha);
-  ellipse(this.pos.x, this.pos.y, this.size);
+    fill(red, 0, 0, alpha);
+    ellipse(this.pos.x, this.pos.y, this.size);
+  }
 }
-}
-
