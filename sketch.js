@@ -2,33 +2,71 @@ let particles = [];
 const num = 3000;
 const noiseScale = 0.002;
 let t = 0;
+let trailBuffer;
+
+let isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+
+let frameDropWarning = false;
+let frameDropTimer = 0;
+let targetParticles = num;
+let lastFrameTime = 0;
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
-  noStroke();
+  if (isChrome) {
+    pixelDensity(1);
+    createCanvas(windowWidth, windowHeight, P2D);
+    trailBuffer = createGraphics(width, height, P2D);
+  } else {
+    createCanvas(windowWidth, windowHeight);
+    trailBuffer = createGraphics(width, height);
+  }
+
+  trailBuffer.noStroke();
   background(0);
-  frameRate(60); // smoother timing across browsers
 
   for (let i = 0; i < num; i++) {
     particles.push(new Particle(random(width), random(height)));
   }
+
+  lastFrameTime = millis();
 }
 
 function draw() {
-  fill(0, 20); // preserve trailing aesthetic
-  rect(0, 0, width, height);
+  const now = millis();
+  const frameTime = now - lastFrameTime;
+  lastFrameTime = now;
+
+  if (frameTime > 40) {
+    console.log(`Frame drop: ${nf(frameTime, 0, 2)} ms`);
+    if (frameTime > 100 && !frameDropWarning) {
+      frameDropWarning = true;
+      frameDropTimer = now;
+      targetParticles = max(500, targetParticles - 200);
+      particles = particles.slice(0, targetParticles);
+      console.warn("⚠️ Frame spike! Reducing particles to", targetParticles);
+    }
+  }
+
+  if (frameDropWarning && now - frameDropTimer > 5000) {
+    frameDropWarning = false;
+  }
+
+  if (!isChrome || frameCount % 2 === 0) {
+    trailBuffer.fill(0, 25);
+    trailBuffer.rect(0, 0, width, height);
+  }
+
+  let mx = map(mouseX, 0, width, -PI, PI);
+  let my = map(mouseY, 0, height, -PI, PI);
 
   for (let p of particles) {
-    p.update();
-    p.display();
+    p.update(mx, my);
+    p.display(trailBuffer);
   }
 
   t += 0.002;
-}
 
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  background(0); // clears weird stretched trails on resize
+  image(trailBuffer, 0, 0);
 }
 
 class Particle {
@@ -40,11 +78,12 @@ class Particle {
     this.offset = random(TWO_PI);
   }
 
-  update() {
-    let mx = map(mouseX, 0, width, -PI, PI);
-    let my = map(mouseY, 0, height, -PI, PI);
+  update(mx, my) {
+    let nx = this.pos.x * noiseScale;
+    let ny = this.pos.y * noiseScale;
+    let nt = isChrome ? Math.floor(t * 20) / 20 : t;
 
-    let n = noise(this.pos.x * noiseScale, this.pos.y * noiseScale, t);
+    let n = noise(nx, ny, nt);
     let angle = n * TWO_PI * 2 + mx * (this.pos.y / height) + my * (this.pos.x / width);
     this.vel.set(cos(angle), sin(angle));
 
@@ -55,15 +94,14 @@ class Particle {
     this.pos.y = (this.pos.y + height) % height;
   }
 
-  display() {
+  display(pg) {
     let dx = this.pos.x - width / 2;
     let dy = this.pos.y - height / 2;
-    let d = sqrt(dx * dx + dy * dy); // same result, faster than dist()
+    let d = Math.sqrt(dx * dx + dy * dy);
 
     let red = 150 + sin(t * 2 + this.offset + d * 0.005) * 80;
     let alpha = map(sin(t + d * 0.02), -1, 1, 60, 200);
-
-    fill(red, 0, 0, alpha);
-    ellipse(this.pos.x, this.pos.y, this.size);
+    pg.fill(red, 0, 0, alpha);
+    pg.ellipse(this.pos.x, this.pos.y, this.size);
   }
 }
