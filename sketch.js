@@ -60,9 +60,8 @@ function draw() {
     trailBuffer.rect(0, 0, width, height);
   }
   // use bridged coords when fresh (<500ms old), else native mouse
-  let fresh = extX !== null && millis() - extLast < 500;
-  let ux = fresh ? extX : mouseX;
-  let uy = fresh ? extY : mouseY;
+  let ux = (extX !== null) ? extX : mouseX;
+  let uy = (extY !== null) ? extY : mouseY;
   let mx = map(ux, 0, width, -PI, PI);
   let my = map(uy, 0, height, -PI, PI);
   for (let p of particles) {
