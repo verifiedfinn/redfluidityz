@@ -8,9 +8,22 @@ let frameDropWarning = false;
 let frameDropTimer = 0;
 let targetParticles = num;
 let lastFrameTime = 0;
+
+// bridged mouse from the parent page (the iframe gets no real mouse
+// events under pointer-events:none). Falls back to native mouse if
+// the bridge goes quiet, so it can never go dumb.
+let extX = null, extY = null, extLast = 0;
+window.addEventListener('message', function (e) {
+  if (e.data && e.data.type === 'mouse') {
+    extX = e.data.x;
+    extY = e.data.y;
+    extLast = millis();
+  }
+});
+
 function setup() {
+  pixelDensity(1); // all browsers — retina 4x cost isn't worth it for a background
   if (isChrome) {
-    pixelDensity(1);
     createCanvas(windowWidth, windowHeight, P2D);
     trailBuffer = createGraphics(width, height, P2D);
   } else {
@@ -24,6 +37,7 @@ function setup() {
   }
   lastFrameTime = millis();
 }
+
 function draw() {
   const now = millis();
   const frameTime = now - lastFrameTime;
@@ -45,8 +59,12 @@ function draw() {
     trailBuffer.fill(0, 25);
     trailBuffer.rect(0, 0, width, height);
   }
-  let mx = map(mouseX, 0, width, -PI, PI);
-  let my = map(mouseY, 0, height, -PI, PI);
+  // use bridged coords when fresh (<500ms old), else native mouse
+  let fresh = extX !== null && millis() - extLast < 500;
+  let ux = fresh ? extX : mouseX;
+  let uy = fresh ? extY : mouseY;
+  let mx = map(ux, 0, width, -PI, PI);
+  let my = map(uy, 0, height, -PI, PI);
   for (let p of particles) {
     p.update(mx, my);
     p.display(trailBuffer);
@@ -54,6 +72,7 @@ function draw() {
   t += 0.002;
   image(trailBuffer, 0, 0);
 }
+
 class Particle {
   constructor(x, y) {
     this.pos = createVector(x, y);
@@ -83,4 +102,11 @@ class Particle {
     pg.fill(red, 0, 0, alpha);
     pg.ellipse(this.pos.x, this.pos.y, this.size);
   }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  trailBuffer = isChrome ? createGraphics(width, height, P2D) : createGraphics(width, height);
+  trailBuffer.noStroke();
+  background(0);
 }
